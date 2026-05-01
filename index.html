@@ -51,7 +51,7 @@
   .doc-mini-card { background: #fff; border-radius: 10px; padding: 14px 16px; box-shadow: 0 1px 5px rgba(0,0,0,0.08); border-left: 4px solid; }
   .doc-mini-card .doc-name { font-size: 13px; font-weight: 700; color: #2d3748; margin-bottom: 2px; }
   .doc-mini-card .doc-total { font-size: 11px; color: #718096; margin-bottom: 10px; }
-  .doc-mini-wrap { position: relative; height: 130px; }
+  .doc-mini-wrap { position: relative; height: 210px; }
 
   .summary-table { width: 100%; border-collapse: collapse; font-size: 13px; }
   .summary-table th { background: #2b6cb0; color: #fff; padding: 9px 12px; text-align: center; font-weight: 600; }
@@ -189,15 +189,7 @@
 
 <!-- 医師別推移 -->
 <div class="tab-content" id="tab-doctor">
-  <div class="chart-card">
-    <h2>月間 診療報酬・総支給・収益 推移（医師合計）</h2>
-    <div class="chart-wrap"><canvas id="chartDocSummary"></canvas></div>
-  </div>
-  <div class="chart-card" style="margin-top:18px">
-    <h2>月間 診療報酬・総支給・収益 データ一覧</h2>
-    <div style="overflow-x:auto"><table class="summary-table" id="tableDocSummary"></table></div>
-  </div>
-  <div class="doc-grid" id="docGrid" style="margin-top:20px"></div>
+  <div class="doc-grid" id="docGrid"></div>
   <div class="chart-card" style="margin-top:20px">
     <h2>医師別 累計売上ランキング</h2>
     <div style="overflow-x:auto;margin-top:4px">
@@ -407,50 +399,63 @@ buildDataTable('tableGrand',
   })
 );
 
-// ── 医師合計 診療報酬・総支給・収益 チャート ──
-new Chart(document.getElementById('chartDocSummary'),{ type:'line', data:{ labels:shortM, datasets:[
-  lineDs('診療報酬合計', DATA.total_rev_monthly, '#3182ce', true),
-  lineDs('総支給合計',   DATA.total_sal_monthly, '#e53e3e'),
-  lineDs('収益合計',     DATA.total_prf_monthly, '#38a169', true)
-]}, options:{...baseOpts}});
-
-// ── 医師合計 データテーブル ──
-buildDataTable('tableDocSummary',
-  ['年月','診療報酬合計（円）','総支給合計（円）','収益合計（円）','収益率'],
-  months.map((m,i)=>{
-    const rev=DATA.total_rev_monthly[i]||0;
-    const sal=DATA.total_sal_monthly[i]||0;
-    const prf=DATA.total_prf_monthly[i]||0;
-    return [m, n(rev), n(sal), n(prf), p(rev>0?prf/rev*100:0)];
-  })
-);
-
 // 医師別
 const docTotals = {};
 DATA.docs.forEach(d=>{ docTotals[d]=(DATA.doc_monthly[d]||[]).reduce((a,b)=>a+b,0); });
 const docSorted = [...DATA.docs].filter(d=>docTotals[d]>0).sort((a,b)=>docTotals[b]-docTotals[a]);
 
-// ランキングテーブル（全期間）
+// ランキングテーブル（診療報酬・総支給・収益）
 (()=>{
   const tbl=document.getElementById('docRankTable');
-  let html='<tr><th style="position:sticky;left:0;z-index:2;background:#2b6cb0">順位</th><th style="position:sticky;left:40px;z-index:2;background:#2b6cb0;min-width:110px">医師名</th><th style="position:sticky;left:150px;z-index:2;background:#2b6cb0;min-width:110px">累計合計</th>';
-  months.forEach(m=>html+=`<th style="min-width:72px;white-space:nowrap">${m.replace('年','/').replace('月','')}</th>`);
+  const S='position:sticky;z-index:1;background:inherit;';
+  let html='<tr>'
+    +'<th style="position:sticky;left:0;z-index:2;background:#2b6cb0;min-width:38px">順位</th>'
+    +'<th style="position:sticky;left:38px;z-index:2;background:#2b6cb0;min-width:110px">医師名</th>'
+    +'<th style="position:sticky;left:148px;z-index:2;background:#2b6cb0;min-width:105px">診療報酬累計</th>'
+    +'<th style="position:sticky;left:253px;z-index:2;background:#9b2226;min-width:95px">総支給累計</th>'
+    +'<th style="position:sticky;left:348px;z-index:2;background:#276749;min-width:95px">収益累計</th>';
+  months.forEach(m=>{
+    const ms=m.replace('年','/').replace('月','');
+    html+='<th style="min-width:76px;white-space:nowrap;background:#3a7bd5">'+ms+'<br><span style="font-size:9px;font-weight:400">診療報酬</span></th>'
+         +'<th style="min-width:72px;white-space:nowrap;background:#9b2226">'+ms+'<br><span style="font-size:9px;font-weight:400">総支給</span></th>'
+         +'<th style="min-width:72px;white-space:nowrap;background:#276749">'+ms+'<br><span style="font-size:9px;font-weight:400">収益</span></th>';
+  });
   html+='</tr>';
   docSorted.forEach((doc,i)=>{
-    const tot=docTotals[doc];
+    const revTot=docTotals[doc];
+    const salTot=(DATA.sal_monthly[doc]||[]).reduce((a,b)=>a+b,0);
+    const prfTot=revTot-salTot;
     const bg=i%2===0?'':'background:#f7fafc';
-    const cells=months.map(m=>{ const v=DATA.doc_monthly[doc]?.[months.indexOf(m)]; return `<td>${v?v.toLocaleString():'—'}</td>`; }).join('');
-    html+=`<tr style="${bg}"><td style="position:sticky;left:0;background:inherit;z-index:1">${i+1}</td><td style="position:sticky;left:40px;background:inherit;z-index:1;text-align:left;padding-left:10px">${doc}</td><td style="position:sticky;left:150px;background:inherit;z-index:1;font-weight:700">${tot.toLocaleString()}</td>${cells}</tr>`;
+    let cells='';
+    months.forEach((m,mi)=>{
+      const rev=DATA.doc_monthly[doc]?.[mi]||0;
+      const sal=(DATA.sal_monthly[doc]||[])[mi]||0;
+      const prf=rev-sal;
+      cells+='<td>'+(rev?rev.toLocaleString():'—')+'</td>'
+            +'<td style="color:#9b2226">'+(sal?sal.toLocaleString():'—')+'</td>'
+            +'<td style="color:'+(prf<0?'#9b2226':'#276749')+';font-weight:'+(prf<0?700:400)+'">'
+            +((rev||sal)?prf.toLocaleString():'—')+'</td>';
+    });
+    html+='<tr style="'+bg+'">'
+      +'<td style="'+S+'left:0;text-align:center">'+(i+1)+'</td>'
+      +'<td style="'+S+'left:38px;text-align:left;padding-left:8px">'+doc+'</td>'
+      +'<td style="'+S+'left:148px;font-weight:700">'+revTot.toLocaleString()+'</td>'
+      +'<td style="'+S+'left:253px;color:#9b2226;font-weight:700">'+salTot.toLocaleString()+'</td>'
+      +'<td style="'+S+'left:348px;color:'+(prfTot<0?'#9b2226':'#276749')+';font-weight:700">'+prfTot.toLocaleString()+'</td>'
+      +cells+'</tr>';
   });
   tbl.innerHTML=html;
 })();
 
-// 医師別ミニチャートグリッド
+// 医師別ミニチャートグリッド（診療報酬・総支給・収益）
 (()=>{
   const grid=document.getElementById('docGrid');
   const miniOpts={
     responsive:true, maintainAspectRatio:false,
-    plugins:{ legend:{display:false}, tooltip:{callbacks:{label:ctx=>' '+Math.round(ctx.raw).toLocaleString()+' 円'}} },
+    plugins:{
+      legend:{ display:true, position:'top', labels:{ font:{size:9}, boxWidth:10, padding:5 } },
+      tooltip:{ callbacks:{ label:ctx=>' '+Math.round(ctx.raw).toLocaleString()+' 円' } }
+    },
     scales:{
       x:{ ticks:{ font:{size:9}, maxTicksLimit:8, maxRotation:45 } },
       y:{ ticks:{ font:{size:9}, callback:v=>fmtM(v) } }
@@ -458,18 +463,31 @@ const docSorted = [...DATA.docs].filter(d=>docTotals[d]>0).sort((a,b)=>docTotals
   };
   docSorted.forEach((doc,i)=>{
     const color=PALETTE[i%PALETTE.length];
-    const vals=DATA.doc_monthly[doc]||[];
+    const rev=DATA.doc_monthly[doc]||[];
+    const sal=DATA.sal_monthly[doc]||[];
+    const prf=DATA.profit_monthly[doc]||[];
     const tot=docTotals[doc];
+    const salTot=(sal).reduce((a,b)=>a+b,0);
+    const prfTot=tot-salTot;
     const card=document.createElement('div');
     card.className='doc-mini-card';
     card.style.borderLeftColor=color;
-    card.innerHTML=`<div class="doc-name">${doc}</div><div class="doc-total">累計: ¥${tot.toLocaleString()}</div><div class="doc-mini-wrap"><canvas id="dc${i}"></canvas></div>`;
+    card.innerHTML=
+      '<div class="doc-name">'+doc+'</div>'
+      +'<div class="doc-total" style="font-size:10px;line-height:1.6">'
+      +'診療報酬累計: ¥'+tot.toLocaleString()+'<br>'
+      +'総支給累計: ¥'+salTot.toLocaleString()
+      +(salTot>0 ? ' &nbsp;|&nbsp; 収益累計: ¥'+prfTot.toLocaleString() : '')
+      +'</div>'
+      +'<div class="doc-mini-wrap"><canvas id="dc'+i+'"></canvas></div>';
     grid.appendChild(card);
     requestAnimationFrame(()=>{
-      new Chart(document.getElementById(`dc${i}`),{
+      new Chart(document.getElementById('dc'+i),{
         type:'line',
         data:{ labels:shortM, datasets:[
-          { data:vals, borderColor:color, backgroundColor:rgba(color,.12), borderWidth:2, pointRadius:2, tension:0.3, fill:true }
+          { label:'診療報酬', data:rev, borderColor:color,     backgroundColor:rgba(color,.1),       borderWidth:1.8, pointRadius:2, tension:0.3, fill:true },
+          { label:'総支給',   data:sal, borderColor:'#e53e3e', backgroundColor:'transparent',        borderWidth:1.5, pointRadius:2, tension:0.3, fill:false, borderDash:[4,3] },
+          { label:'収益',     data:prf, borderColor:'#38a169', backgroundColor:rgba('#38a169',.08),  borderWidth:1.5, pointRadius:2, tension:0.3, fill:true }
         ]},
         options:{ ...miniOpts }
       });
